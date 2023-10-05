@@ -1,1 +1,3 @@
+*.swp
+/shopping.db
 /target
