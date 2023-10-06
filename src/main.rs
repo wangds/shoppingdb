@@ -1,15 +1,26 @@
 #![macro_use]
 extern crate rusqlite;
 
+mod app;
+mod ui;
+
+use ratatui::prelude::{CrosstermBackend, Terminal};
 use rusqlite::{params, Connection, Result};
 
 const DATABASE_FILE: &str = "shopping.db";
 
-fn main() -> Result<()> {
-    let conn = Connection::open(DATABASE_FILE)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Setup terminal
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(std::io::stderr(), crossterm::terminal::EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stderr()))?;
 
+    // Create app and run it
+    let app = app::App::new();
+    let conn = Connection::open(DATABASE_FILE)?;
     create_database(&conn)?;
-    insert_item(&conn, "2023", "cat", "dog", 100)?;
+
+    println!("date: {}", app.date);
 
     let categories = select_categories(&conn)?;
     for category in categories {
@@ -20,6 +31,26 @@ fn main() -> Result<()> {
     for description in descriptions {
         println!("desc: {}", description);
     }
+
+    loop {
+        terminal.draw(|f| ui::render_tui(f))?;
+
+        if crossterm::event::poll(std::time::Duration::from_millis(250))? {
+            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
+                if key.code == crossterm::event::KeyCode::Char('a') {
+                    insert_item(&conn, "2023", "cat", "dog", 100)?;
+                }
+
+                if key.code == crossterm::event::KeyCode::F(10) {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Restore terminal
+    crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen)?;
+    crossterm::terminal::disable_raw_mode()?;
 
     Ok(())
 }
