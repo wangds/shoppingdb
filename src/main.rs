@@ -6,6 +6,7 @@ mod ui;
 
 use ratatui::prelude::{CrosstermBackend, Terminal};
 use rusqlite::{params, Connection, Result};
+use tui_textarea::TextArea;
 
 const DATABASE_FILE: &str = "shopping.db";
 
@@ -32,17 +33,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("desc: {}", description);
     }
 
+    let mut textarea = TextArea::default();
+
     loop {
-        terminal.draw(|f| ui::render_tui(f))?;
+        terminal.draw(|f| ui::render_tui(f, &textarea))?;
 
         if crossterm::event::poll(std::time::Duration::from_millis(250))? {
             if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
-                if key.code == crossterm::event::KeyCode::Char('a') {
-                    insert_item(&conn, "2023", "cat", "dog", 100)?;
-                }
-
                 if key.code == crossterm::event::KeyCode::F(10) {
                     break;
+                }
+
+                if key.code == crossterm::event::KeyCode::Enter {
+                    let lines = textarea.into_lines();
+                    insert_item(&conn, "2023", "cat", &lines[0], 100)?;
+                    textarea = TextArea::default();
+                } else {
+                    textarea.input(key);
                 }
             }
         }
