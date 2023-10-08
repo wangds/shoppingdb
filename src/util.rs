@@ -7,3 +7,25 @@ pub fn parse_date(line: &str) -> Option<NaiveDate> {
         None
     }
 }
+
+pub fn parse_price(line: &str) -> Option<i64> {
+    let dollars: &str;
+    let cents: Option<i64>;
+
+    if let Some((d, c)) = line.split_once('.') {
+        dollars = d;
+        cents = match c.len() {
+            0 => Some(0i64),
+            1 => c.parse::<i64>().ok().map(|c| c * 10),
+            2 => c.parse::<i64>().ok(),
+            _ => None,
+        };
+    } else {
+        dollars = line;
+        cents = Some(0i64)
+    }
+
+    cents
+        .zip(dollars.parse::<i64>().ok())
+        .map(|(c, d)| 100 * d + c)
+}
