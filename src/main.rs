@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match app.state {
                     AppState::Browse => main_browse(&mut app, key),
                     AppState::InsertDate => main_insert_date(&mut app, key),
-                    AppState::InsertDescription => main_insert_description(&mut app, key),
+                    AppState::InsertDescription => main_insert_description(&mut app, key, &conn)?,
                     AppState::InsertCategory => main_insert_category(&mut app, key),
                     AppState::InsertPrice => main_insert_price(&mut app, key, &conn)?,
                 };
@@ -77,7 +77,7 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
     }
 }
 
-fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent) {
+fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         if line.len() == 0 {
@@ -85,10 +85,15 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent) {
         } else {
             app.description = String::from(line);
             app.transition(AppState::InsertCategory);
+            if let Ok(autofill) = select_category(&conn, &app.description) {
+                app.textarea.insert_str(autofill);
+            }
         }
     } else {
         app.textarea.input(key);
     }
+
+    Ok(())
 }
 
 fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
@@ -162,6 +167,14 @@ fn select_items(conn: &Connection) -> Result<Vec<DbItem>> {
     })?;
 
     Ok(iter.map(|item| item.unwrap()).collect())
+}
+
+fn select_category(conn: &Connection, description: &str) -> Result<String> {
+    conn.query_row(
+        "SELECT category FROM items WHERE description=?1 LIMIT 1",
+        params![description],
+        |row| row.get(0),
+    )
 }
 
 fn select_categories(conn: &Connection) -> Result<Vec<String>> {
