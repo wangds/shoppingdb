@@ -3,11 +3,12 @@ extern crate rusqlite;
 
 mod app;
 mod ui;
+mod util;
 
-use crate::app::DbItem;
+use crate::app::{App, AppState, DbItem};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::{CrosstermBackend, Terminal};
 use rusqlite::{params, Connection, Result};
-use tui_textarea::TextArea;
 
 const DATABASE_FILE: &str = "shopping.db";
 
@@ -18,36 +19,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stderr()))?;
 
     // Create app and run it
-    let mut app = app::App::new();
+    let mut app = App::new();
     let conn = Connection::open(DATABASE_FILE)?;
     create_database(&conn)?;
 
     app.items = select_items(&conn)?;
-    app.categories = select_categories(&conn)?;
-    app.descriptions = select_descriptions(&conn)?;
-
-    let mut textarea = TextArea::default();
+    app.distinct_categories = select_categories(&conn)?;
+    app.distinct_descriptions = select_descriptions(&conn)?;
 
     loop {
-        terminal.draw(|f| ui::render_tui(f, &app, &textarea))?;
+        terminal.draw(|f| ui::render_tui(f, &mut app))?;
 
         if crossterm::event::poll(std::time::Duration::from_millis(250))? {
             if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
-                if key.code == crossterm::event::KeyCode::F(10) {
+                if key.code == KeyCode::F(10) {
                     break;
+                } else if key.code == KeyCode::Esc {
+                    app.transition(AppState::Browse);
+                    continue;
                 }
 
-                if key.code == crossterm::event::KeyCode::Enter {
-                    let lines = textarea.into_lines();
-                    insert_item(&conn, "2023", "cat", &lines[0], 100)?;
-
-                    app.items = select_items(&conn)?;
-                    app.categories = select_categories(&conn)?;
-                    app.descriptions = select_descriptions(&conn)?;
-                    textarea = TextArea::default();
-                } else {
-                    textarea.input(key);
-                }
+                match app.state {
+                    AppState::Browse => main_browse(&mut app, key),
+                    AppState::InsertDate => main_insert_date(&mut app, key),
+                    AppState::InsertDescription => main_insert_description(&mut app, key),
+                    AppState::InsertCategory => main_insert_category(&mut app, key),
+                    AppState::InsertPrice => main_insert_price(&mut app, key, &conn)?,
+                };
             }
         }
     }
@@ -55,6 +53,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Restore terminal
     crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen)?;
     crossterm::terminal::disable_raw_mode()?;
+
+    Ok(())
+}
+
+fn main_browse(app: &mut App, key: KeyEvent) {
+    if key.code == KeyCode::F(7) {
+        app.transition(AppState::InsertDate);
+    }
+}
+
+fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
+    if key.code == KeyCode::Enter {
+        let line = app.get_text();
+        if line.len() == 0 {
+            app.transition(AppState::Browse);
+        } else if let Some(date) = util::parse_date(&line) {
+            app.date = date.format("%F").to_string();
+            app.transition(AppState::InsertDescription);
+        }
+    } else {
+        app.textarea.input(key);
+    }
+}
+
+fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent) {
+    if key.code == KeyCode::Enter {
+        let line = app.get_text();
+        if line.len() == 0 {
+            app.transition(AppState::Browse);
+        } else {
+            app.description = String::from(line);
+            app.transition(AppState::InsertCategory);
+        }
+    } else {
+        app.textarea.input(key);
+    }
+}
+
+fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
+    if key.code == KeyCode::Enter {
+        let line = app.get_text();
+        app.category = String::from(line);
+        app.transition(AppState::InsertPrice);
+    } else {
+        app.textarea.input(key);
+    }
+}
+
+fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
+    if key.code == KeyCode::Enter {
+        let line = app.get_text();
+        if let Some(price) = util::parse_price(&line) {
+            insert_item(&conn, &app.date, &app.category, &app.description, price)?;
+
+            app.items = select_items(&conn)?;
+            app.distinct_categories = select_categories(&conn)?;
+            app.distinct_descriptions = select_descriptions(&conn)?;
+            app.transition(AppState::InsertDescription);
+        }
+    } else {
+        app.textarea.input(key);
+    }
 
     Ok(())
 }

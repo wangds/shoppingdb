@@ -1,6 +1,6 @@
-use crate::app::{App, DbItem};
+use crate::app::{App, AppState, DbItem};
+use crate::util;
 use ratatui::{prelude::*, widgets::*};
-use tui_textarea::TextArea;
 
 const KEY_BAR_ITEMS: &[(&'static str, &'static str)] = &[
     (" 1", "Help"),
@@ -9,13 +9,13 @@ const KEY_BAR_ITEMS: &[(&'static str, &'static str)] = &[
     (" 4", "    "),
     (" 5", "    "),
     (" 6", "    "),
-    (" 7", "    "),
+    (" 7", "Insert"),
     (" 8", "    "),
     (" 9", "    "),
     ("10", "Quit"),
 ];
 
-pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &App, textarea: &TextArea) {
+pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
@@ -26,7 +26,7 @@ pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &App, textarea: &TextAr
         .split(frame.size());
 
     render_table(frame, layout[0], &app.items);
-    render_text_area(frame, layout[1], textarea);
+    render_text_area(frame, layout[1], app);
     render_key_bar(frame, layout[2]);
 }
 
@@ -74,14 +74,38 @@ fn make_table_row<'a>(item: &DbItem) -> Row<'a> {
     ])
 }
 
-fn render_text_area<B: Backend>(frame: &mut Frame<B>, layout: Rect, textarea: &TextArea) {
+fn render_text_area<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
+    let prompt = Span::from(match app.state {
+        AppState::Browse => "> ",
+        AppState::InsertDate => "date> ",
+        AppState::InsertDescription => "desc> ",
+        AppState::InsertCategory => "cat…> ",
+        AppState::InsertPrice => "cost> ",
+    });
+
+    let is_valid = match app.state {
+        AppState::InsertDate => util::parse_date(app.get_text()).is_some(),
+        AppState::InsertPrice => util::parse_price(app.get_text()).is_some(),
+        _ => true,
+    };
+
+    if is_valid {
+        app.textarea.set_style(Style::default())
+    } else {
+        app.textarea
+            .set_style(Style::default().fg(Color::Red).bold())
+    }
+
     let div = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(vec![Constraint::Length(2), Constraint::Min(0)])
+        .constraints(vec![
+            Constraint::Length(prompt.width() as u16),
+            Constraint::Min(0),
+        ])
         .split(layout);
 
-    frame.render_widget(Paragraph::new("> "), div[0]);
-    frame.render_widget(textarea.widget(), div[1]);
+    frame.render_widget(Paragraph::new(prompt), div[0]);
+    frame.render_widget(app.textarea.widget(), div[1]);
 }
 
 fn render_key_bar<B: Backend>(frame: &mut Frame<B>, layout: Rect) {
