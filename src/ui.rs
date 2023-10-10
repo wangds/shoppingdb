@@ -10,7 +10,7 @@ const KEY_BAR_ITEMS: &[(&'static str, &'static str)] = &[
     (" 5", "    "),
     (" 6", "    "),
     (" 7", "Insert"),
-    (" 8", "    "),
+    (" 8", "Delete"),
     (" 9", "    "),
     ("10", "Quit"),
 ];
@@ -25,12 +25,12 @@ pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         ])
         .split(frame.size());
 
-    render_table(frame, layout[0], &app.items);
+    render_table(frame, layout[0], app);
     render_text_area(frame, layout[1], app);
     render_key_bar(frame, layout[2]);
 }
 
-fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, items: &Vec<DbItem>) {
+fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
     let header = Row::new(vec![
         Cell::from(Line::from("Id").alignment(Alignment::Center)),
         Cell::from(Line::from("Date").alignment(Alignment::Center)),
@@ -42,7 +42,7 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, items: &Vec<DbIt
 
     let mut body: Vec<Row> = Vec::new();
 
-    for item in items {
+    for item in &app.items {
         body.push(make_table_row(&item));
     }
 
@@ -50,6 +50,7 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, items: &Vec<DbIt
         .block(Block::default().borders(Borders::ALL))
         .header(header)
         .style(Style::default().fg(Color::White).bg(Color::Blue))
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
         .widths(&[
             Constraint::Length(4),
             Constraint::Length(4 + 1 + 2 + 1 + 2),
@@ -58,7 +59,7 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, items: &Vec<DbIt
             Constraint::Length(5 + 1 + 2),
         ]);
 
-    frame.render_widget(table, layout);
+    frame.render_stateful_widget(table, layout, &mut app.table_state);
 }
 
 fn make_table_row<'a>(item: &DbItem) -> Row<'a> {

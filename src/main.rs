@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.items = select_items(&conn)?;
     app.distinct_categories = select_categories(&conn)?;
     app.distinct_descriptions = select_descriptions(&conn)?;
+    app.select_first();
 
     loop {
         terminal.draw(|f| ui::render_tui(f, &mut app))?;
@@ -58,7 +59,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main_browse(app: &mut App, key: KeyEvent) {
-    if key.code == KeyCode::F(7) {
+    if key.code == KeyCode::Up {
+        app.select_prev(1);
+    } else if key.code == KeyCode::Down {
+        app.select_next(1);
+    } else if key.code == KeyCode::PageUp {
+        app.select_prev(10);
+    } else if key.code == KeyCode::PageDown {
+        app.select_next(10);
+    } else if key.code == KeyCode::Home {
+        app.select_first();
+    } else if key.code == KeyCode::End {
+        app.select_last();
+    } else if key.code == KeyCode::F(7) {
         app.transition(AppState::InsertDate);
     }
 }
@@ -110,12 +123,15 @@ fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) ->
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         if let Some(price) = util::parse_price(&line) {
-            insert_item(&conn, &app.date, &app.category, &app.description, price)?;
+            let rowid = insert_item(&conn, &app.date, &app.category, &app.description, price)?;
 
             app.items = select_items(&conn)?;
             app.distinct_categories = select_categories(&conn)?;
             app.distinct_descriptions = select_descriptions(&conn)?;
             app.transition(AppState::InsertDescription);
+
+            app.table_state
+                .select(app.items.iter().position(|item| item.id == rowid));
         }
     } else {
         app.textarea.input(key);
@@ -145,13 +161,13 @@ fn insert_item(
     category: &str,
     description: &str,
     price: i64,
-) -> Result<()> {
+) -> Result<i64> {
     let mut stmt = conn
         .prepare("INSERT INTO items(date, category, description, price) values (?1, ?2, ?3, ?4)")?;
 
     stmt.execute(params![date, category, description, price])?;
 
-    Ok(())
+    Ok(conn.last_insert_rowid())
 }
 
 fn select_items(conn: &Connection) -> Result<Vec<DbItem>> {
