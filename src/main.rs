@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 match app.state {
-                    AppState::Browse => main_browse(&mut app, key),
+                    AppState::Browse => main_browse(&mut app, key, &conn)?,
                     AppState::InsertDate => main_insert_date(&mut app, key),
                     AppState::InsertDescription => main_insert_description(&mut app, key, &conn)?,
                     AppState::InsertCategory => main_insert_category(&mut app, key),
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main_browse(app: &mut App, key: KeyEvent) {
+fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
     if key.code == KeyCode::Up {
         app.select_prev(1);
     } else if key.code == KeyCode::Down {
@@ -73,7 +73,18 @@ fn main_browse(app: &mut App, key: KeyEvent) {
         app.select_last();
     } else if key.code == KeyCode::F(7) {
         app.transition(AppState::InsertDate);
+    } else if key.code == KeyCode::F(8) {
+        if let Some(i) = app.table_state.selected() {
+            delete_item(conn, app.items[i].id)?;
+
+            app.items = select_items(&conn)?;
+            app.distinct_categories = select_categories(&conn)?;
+            app.distinct_descriptions = select_descriptions(&conn)?;
+            app.select_next(0);
+        }
     }
+
+    Ok(())
 }
 
 fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
@@ -168,6 +179,12 @@ fn insert_item(
     stmt.execute(params![date, category, description, price])?;
 
     Ok(conn.last_insert_rowid())
+}
+
+fn delete_item(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM items WHERE id=?1", params![id])?;
+
+    Ok(())
 }
 
 fn select_items(conn: &Connection) -> Result<Vec<DbItem>> {
