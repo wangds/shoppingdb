@@ -6,7 +6,7 @@ const KEY_BAR_ITEMS: &[(&'static str, &'static str)] = &[
     (" 1", "Help"),
     (" 2", "    "),
     (" 3", "    "),
-    (" 4", "    "),
+    (" 4", "Edit"),
     (" 5", "    "),
     (" 6", "    "),
     (" 7", "Insert"),

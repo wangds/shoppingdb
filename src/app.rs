@@ -10,6 +10,9 @@ pub struct App<'a> {
     // Text area widget for entering Date, Category, Description.
     pub textarea: TextArea<'a>,
 
+    // Copy of DbItem being edited.
+    pub item_template: Option<DbItem>,
+
     // Date of items being entered.
     pub date: String,
 
@@ -36,6 +39,7 @@ impl App<'_> {
             table_state: TableState::default(),
             textarea: TextArea::<'a>::default(),
 
+            item_template: None,
             date: String::new(),
             category: String::new(),
             description: String::new(),
@@ -111,6 +115,7 @@ impl App<'_> {
         self.textarea = TextArea::default();
 
         match state {
+            AppState::Browse => self.item_template = None,
             AppState::InsertDate => self.textarea.set_placeholder_text("yyyy-mm-dd"),
             _ => (),
         };
@@ -120,13 +125,15 @@ impl App<'_> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AppState {
     Browse,
+
+    // F4: Edit, F7: Insert
     InsertDate,
     InsertDescription,
     InsertCategory,
     InsertPrice,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DbItem {
     pub id: i64,
     pub date: String,

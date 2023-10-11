@@ -71,6 +71,12 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
         app.select_first();
     } else if key.code == KeyCode::End {
         app.select_last();
+    } else if key.code == KeyCode::F(4) {
+        if let Some(i) = app.table_state.selected() {
+            app.item_template = Some(app.items[i].clone());
+            app.transition(AppState::InsertDate);
+            app.textarea.insert_str(&app.items[i].date);
+        }
     } else if key.code == KeyCode::F(7) {
         app.transition(AppState::InsertDate);
     } else if key.code == KeyCode::F(8) {
@@ -94,7 +100,11 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
             app.transition(AppState::Browse);
         } else if let Some(date) = util::parse_date(&line) {
             app.date = date.format("%F").to_string();
+
             app.transition(AppState::InsertDescription);
+            if let Some(item) = &app.item_template {
+                app.textarea.insert_str(&item.description);
+            }
         }
     } else {
         app.textarea.input(key);
@@ -108,8 +118,11 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connecti
             app.transition(AppState::Browse);
         } else {
             app.description = String::from(line);
+
             app.transition(AppState::InsertCategory);
-            if let Ok(autofill) = select_category(&conn, &app.description) {
+            if let Some(item) = &app.item_template {
+                app.textarea.insert_str(&item.category);
+            } else if let Ok(autofill) = select_category(&conn, &app.description) {
                 app.textarea.insert_str(autofill);
             }
         }
@@ -124,7 +137,12 @@ fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         app.category = String::from(line);
+
         app.transition(AppState::InsertPrice);
+        if let Some(item) = &app.item_template {
+            let price = format!("{}.{:02}", item.price / 100, item.price % 100);
+            app.textarea.insert_str(price);
+        }
     } else {
         app.textarea.input(key);
     }
@@ -134,15 +152,33 @@ fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) ->
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         if let Some(price) = util::parse_price(&line) {
-            let rowid = insert_item(&conn, &app.date, &app.category, &app.description, price)?;
+            let rowid: i64;
+
+            if let Some(item) = &app.item_template {
+                rowid = item.id;
+                update_item(
+                    &conn,
+                    rowid,
+                    &app.date,
+                    &app.category,
+                    &app.description,
+                    price,
+                )?;
+            } else {
+                rowid = insert_item(&conn, &app.date, &app.category, &app.description, price)?;
+            }
 
             app.items = select_items(&conn)?;
             app.distinct_categories = select_categories(&conn)?;
             app.distinct_descriptions = select_descriptions(&conn)?;
-            app.transition(AppState::InsertDescription);
-
             app.table_state
                 .select(app.items.iter().position(|item| item.id == rowid));
+
+            if app.item_template.is_some() {
+                app.transition(AppState::Browse);
+            } else {
+                app.transition(AppState::InsertDescription);
+            }
         }
     } else {
         app.textarea.input(key);
@@ -179,6 +215,22 @@ fn insert_item(
     stmt.execute(params![date, category, description, price])?;
 
     Ok(conn.last_insert_rowid())
+}
+
+fn update_item(
+    conn: &Connection,
+    id: i64,
+    date: &str,
+    category: &str,
+    description: &str,
+    price: i64,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE items SET date=?1, category=?2, description=?3, price=?4 WHERE id=?5",
+        params![date, category, description, price, id],
+    )?;
+
+    Ok(())
 }
 
 fn delete_item(conn: &Connection, id: i64) -> Result<()> {
