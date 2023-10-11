@@ -46,18 +46,29 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
         body.push(make_table_row(&item));
     }
 
+    let mut widths = vec![
+        Constraint::Length(6),                 // id
+        Constraint::Length(4 + 1 + 2 + 1 + 2), // date
+        Constraint::Length(0),                 // category
+        Constraint::Min(0),                    // description
+        Constraint::Length(5 + 1 + 2),         // price
+    ];
+
+    let div = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(widths.clone())
+        .split(layout);
+
+    // Divide width between category and description
+    widths[2] = Constraint::Max(div[3].width / 3);
+    widths[3] = Constraint::Min(div[3].width * 2 / 3);
+
     let table = Table::new(body)
         .block(Block::default().borders(Borders::ALL))
         .header(header)
         .style(Style::default().fg(Color::White).bg(Color::Blue))
         .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
-        .widths(&[
-            Constraint::Length(4),
-            Constraint::Length(4 + 1 + 2 + 1 + 2),
-            Constraint::Percentage(40),
-            Constraint::Percentage(40),
-            Constraint::Length(5 + 1 + 2),
-        ]);
+        .widths(&widths);
 
     frame.render_stateful_widget(table, layout, &mut app.table_state);
 }
