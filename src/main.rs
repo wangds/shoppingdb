@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.items = select_items(&conn)?;
     app.distinct_categories = select_categories(&conn)?;
     app.distinct_descriptions = select_descriptions(&conn)?;
-    app.select_first();
+    app.table_state.select(navigate_home(&app.items));
 
     loop {
         terminal.draw(|f| ui::render_tui(f, &mut app))?;
@@ -60,17 +60,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
     if key.code == KeyCode::Up {
-        app.select_prev(1);
+        app.table_state
+            .select(navigate_up(&app.items, app.table_state.selected(), 1));
     } else if key.code == KeyCode::Down {
-        app.select_next(1);
+        app.table_state
+            .select(navigate_down(&app.items, app.table_state.selected(), 1));
     } else if key.code == KeyCode::PageUp {
-        app.select_prev(10);
+        app.table_state
+            .select(navigate_up(&app.items, app.table_state.selected(), 10));
     } else if key.code == KeyCode::PageDown {
-        app.select_next(10);
+        app.table_state
+            .select(navigate_down(&app.items, app.table_state.selected(), 10));
     } else if key.code == KeyCode::Home {
-        app.select_first();
+        app.table_state.select(navigate_home(&app.items));
     } else if key.code == KeyCode::End {
-        app.select_last();
+        app.table_state.select(navigate_end(&app.items));
     } else if key.code == KeyCode::F(4) {
         if let Some(i) = app.table_state.selected() {
             app.item_template = Some(app.items[i].clone());
@@ -86,7 +90,8 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
             app.items = select_items(&conn)?;
             app.distinct_categories = select_categories(&conn)?;
             app.distinct_descriptions = select_descriptions(&conn)?;
-            app.select_next(0);
+            app.table_state
+                .select(navigate_down(&app.items, app.table_state.selected(), 0));
         }
     }
 
@@ -105,6 +110,7 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
             if let Some(item) = &app.item_template {
                 app.textarea.insert_str(&item.description);
             }
+            app.update_history();
         }
     } else {
         app.textarea.input(key);
@@ -112,6 +118,10 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
 }
 
 fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
+    if handle_history_input(app, key) {
+        return Ok(());
+    }
+
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         if line.is_empty() {
@@ -122,18 +132,25 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connecti
             app.transition(AppState::InsertCategory);
             if let Some(item) = &app.item_template {
                 app.textarea.insert_str(&item.category);
+                app.update_history();
             } else if let Ok(autofill) = select_category(&conn, &app.description) {
                 app.textarea.insert_str(autofill);
+                app.update_history();
             }
         }
     } else {
         app.textarea.input(key);
+        app.update_history();
     }
 
     Ok(())
 }
 
 fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
+    if handle_history_input(app, key) {
+        return;
+    }
+
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         app.category = String::from(line);
@@ -144,6 +161,7 @@ fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
         }
     } else {
         app.textarea.input(key);
+        app.update_history();
     }
 }
 
@@ -184,6 +202,89 @@ fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) ->
     }
 
     Ok(())
+}
+
+fn handle_history_input<'a>(app: &mut App<'a>, key: KeyEvent) -> bool {
+    if key.code == KeyCode::Up {
+        app.list_state
+            .select(navigate_up(&app.history, app.list_state.selected(), 1));
+    } else if key.code == KeyCode::Down {
+        app.list_state
+            .select(navigate_down(&app.history, app.list_state.selected(), 1));
+    } else if key.code == KeyCode::PageUp {
+        app.list_state
+            .select(navigate_up(&app.history, app.list_state.selected(), 10));
+    } else if key.code == KeyCode::PageDown {
+        app.list_state
+            .select(navigate_down(&app.history, app.list_state.selected(), 10));
+    } else if key.code == KeyCode::Home {
+        app.list_state.select(navigate_home(&app.history));
+    } else if key.code == KeyCode::End {
+        app.list_state.select(navigate_end(&app.history));
+    } else if key.code == KeyCode::Tab {
+        if let Some(i) = app.list_state.selected() {
+            if i < app.history.len() {
+                let text = String::from(&app.history[i]);
+                app.textarea.delete_str(0, usize::MAX);
+                app.textarea.insert_str(text);
+                app.update_history();
+            }
+        }
+    } else {
+        return false;
+    }
+
+    true
+}
+
+fn navigate_up<T>(list: &Vec<T>, selected: Option<usize>, delta: usize) -> Option<usize> {
+    if list.is_empty() {
+        None
+    } else {
+        match selected {
+            Some(i) => {
+                if i <= delta {
+                    Some(0)
+                } else {
+                    Some(i - delta)
+                }
+            }
+            None => Some(list.len() - 1),
+        }
+    }
+}
+
+fn navigate_down<T>(list: &Vec<T>, selected: Option<usize>, delta: usize) -> Option<usize> {
+    if list.is_empty() {
+        None
+    } else {
+        match selected {
+            Some(i) => {
+                if i + delta >= list.len() - 1 {
+                    Some(list.len() - 1)
+                } else {
+                    Some(i + delta)
+                }
+            }
+            None => Some(0),
+        }
+    }
+}
+
+fn navigate_home<T>(list: &Vec<T>) -> Option<usize> {
+    if list.is_empty() {
+        None
+    } else {
+        Some(0)
+    }
+}
+
+fn navigate_end<T>(list: &Vec<T>) -> Option<usize> {
+    if list.is_empty() {
+        None
+    } else {
+        Some(list.len() - 1)
+    }
 }
 
 fn create_database(conn: &Connection) -> Result<()> {
@@ -262,7 +363,7 @@ fn select_category(conn: &Connection, description: &str) -> Result<String> {
 }
 
 fn select_categories(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt = conn.prepare("SELECT DISTINCT category FROM items")?;
+    let mut stmt = conn.prepare("SELECT DISTINCT category FROM items ORDER BY category")?;
     let mut rows = stmt.query([])?;
     let mut categories = Vec::new();
 
@@ -274,7 +375,7 @@ fn select_categories(conn: &Connection) -> Result<Vec<String>> {
 }
 
 fn select_descriptions(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt = conn.prepare("SELECT DISTINCT description FROM items")?;
+    let mut stmt = conn.prepare("SELECT DISTINCT description FROM items ORDER BY description")?;
     let mut rows = stmt.query([])?;
     let mut descriptions = Vec::new();
 

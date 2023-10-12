@@ -28,6 +28,7 @@ pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     render_table(frame, layout[0], app);
     render_text_area(frame, layout[1], app);
     render_key_bar(frame, layout[2]);
+    render_text_completion(frame, app);
 }
 
 fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
@@ -133,4 +134,32 @@ fn render_key_bar<B: Backend>(frame: &mut Frame<B>, layout: Rect) {
         let hint = vec![Span::styled(key, key_style), Span::from(text)];
         frame.render_widget(Paragraph::new(Line::from(hint)).style(text_style), div[i]);
     }
+}
+
+fn render_text_completion<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
+    if app.history.is_empty() || frame.size().height <= 7 {
+        return;
+    }
+
+    let items: Vec<ListItem> = app
+        .history
+        .iter()
+        .map(|li| ListItem::new(String::from(li)))
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .padding(Padding::horizontal(1)),
+        )
+        .style(Style::default().fg(Color::White).bg(Color::Cyan))
+        .highlight_style(Style::default().fg(Color::LightYellow).bg(Color::Black));
+
+    let frame_width = frame.size().width;
+    let frame_height = frame.size().height - 2;
+    let height = std::cmp::min(list.len() as u16 + 2, frame_height - 3);
+    let area = Rect::new(4, frame_height - height, frame_width - 2 * 4 - 1, height);
+    frame.render_widget(Clear, area);
+    frame.render_stateful_widget(list, area, &mut app.list_state);
 }
