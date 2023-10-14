@@ -140,8 +140,7 @@ fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
 
         app.transition(AppState::InsertPrice);
         if let Some(item) = &app.item_template {
-            let price = format!("{}.{:02}", item.price / 100, item.price % 100);
-            app.textarea.insert_str(price);
+            app.textarea.insert_str(util::format_price(item.price));
         }
     } else {
         app.textarea.input(key);

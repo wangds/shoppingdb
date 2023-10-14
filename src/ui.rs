@@ -75,7 +75,7 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
 
 fn make_table_row<'a>(item: &DbItem) -> Row<'a> {
     let id = format!("{}", item.id);
-    let price = format!("{}.{:02}", item.price / 100, item.price % 100);
+    let price = util::format_price(item.price);
 
     Row::new(vec![
         Cell::from(Line::from(id).alignment(Alignment::Right)),

@@ -8,6 +8,10 @@ pub fn parse_date(line: &str) -> Option<NaiveDate> {
     }
 }
 
+pub fn format_price(price: i64) -> String {
+    format!("{}.{:02}", price / 100, price % 100)
+}
+
 pub fn parse_price(line: &str) -> Option<i64> {
     let dollars: &str;
     let cents: Option<i64>;
