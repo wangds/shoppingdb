@@ -96,7 +96,7 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
 fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
-        if line.len() == 0 {
+        if line.is_empty() {
             app.transition(AppState::Browse);
         } else if let Some(date) = util::parse_date(&line) {
             app.date = date.format("%F").to_string();
@@ -114,7 +114,7 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
 fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
-        if line.len() == 0 {
+        if line.is_empty() {
             app.transition(AppState::Browse);
         } else {
             app.description = String::from(line);
