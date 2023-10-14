@@ -104,7 +104,7 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
         if line.is_empty() {
             app.transition(AppState::Browse);
         } else if let Some(date) = util::parse_date(&line) {
-            app.date = date.format("%F").to_string();
+            app.new_item.date = date.format("%F").to_string();
 
             app.transition(AppState::InsertDescription);
             if let Some(item) = &app.item_template {
@@ -127,13 +127,13 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connecti
         if line.is_empty() {
             app.transition(AppState::Browse);
         } else {
-            app.description = String::from(line);
+            app.new_item.description = String::from(line);
 
             app.transition(AppState::InsertCategory);
             if let Some(item) = &app.item_template {
                 app.textarea.insert_str(&item.category);
                 app.update_history();
-            } else if let Ok(autofill) = select_category(&conn, &app.description) {
+            } else if let Ok(autofill) = select_category(&conn, &app.new_item.description) {
                 app.textarea.insert_str(autofill);
                 app.update_history();
             }
@@ -153,7 +153,7 @@ fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
 
     if key.code == KeyCode::Enter {
         let line = app.get_text();
-        app.category = String::from(line);
+        app.new_item.category = String::from(line);
 
         app.transition(AppState::InsertPrice);
         if let Some(item) = &app.item_template {
@@ -170,19 +170,13 @@ fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) ->
         let line = app.get_text();
         if let Some(price) = util::parse_price(&line) {
             let rowid: i64;
+            app.new_item.price = price;
 
             if let Some(item) = &app.item_template {
                 rowid = item.id;
-                update_item(
-                    &conn,
-                    rowid,
-                    &app.date,
-                    &app.category,
-                    &app.description,
-                    price,
-                )?;
+                update_item(&conn, rowid, &app.new_item)?;
             } else {
-                rowid = insert_item(&conn, &app.date, &app.category, &app.description, price)?;
+                rowid = insert_item(&conn, &app.new_item)?;
             }
 
             app.items = select_items(&conn)?;
@@ -302,32 +296,24 @@ fn create_database(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn insert_item(
-    conn: &Connection,
-    date: &str,
-    category: &str,
-    description: &str,
-    price: i64,
-) -> Result<i64> {
+fn insert_item(conn: &Connection, item: &DbItem) -> Result<i64> {
     let mut stmt = conn
         .prepare("INSERT INTO items(date, category, description, price) values (?1, ?2, ?3, ?4)")?;
 
-    stmt.execute(params![date, category, description, price])?;
+    stmt.execute(params![
+        item.date,
+        item.category,
+        item.description,
+        item.price
+    ])?;
 
     Ok(conn.last_insert_rowid())
 }
 
-fn update_item(
-    conn: &Connection,
-    id: i64,
-    date: &str,
-    category: &str,
-    description: &str,
-    price: i64,
-) -> Result<()> {
+fn update_item(conn: &Connection, id: i64, item: &DbItem) -> Result<()> {
     conn.execute(
         "UPDATE items SET date=?1, category=?2, description=?3, price=?4 WHERE id=?5",
-        params![date, category, description, price, id],
+        params![item.date, item.category, item.description, item.price, id],
     )?;
 
     Ok(())

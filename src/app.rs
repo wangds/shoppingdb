@@ -16,14 +16,8 @@ pub struct App<'a> {
     // Copy of DbItem being edited.
     pub item_template: Option<DbItem>,
 
-    // Date of items being entered.
-    pub date: String,
-
-    // Category of item being entered.
-    pub category: String,
-
-    // Description of item being entered.
-    pub description: String,
+    // New item being created.
+    pub new_item: DbItem,
 
     // Items queried from database, possibly incomplete.
     pub items: Vec<DbItem>,
@@ -47,9 +41,13 @@ impl App<'_> {
             textarea: TextArea::<'a>::default(),
 
             item_template: None,
-            date: String::new(),
-            category: String::new(),
-            description: String::new(),
+            new_item: DbItem {
+                id: 0,
+                date: String::new(),
+                category: String::new(),
+                description: String::new(),
+                price: 0,
+            },
 
             items: Vec::new(),
             history: Vec::new(),
