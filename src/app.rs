@@ -56,8 +56,8 @@ impl App<'_> {
         }
     }
 
-    pub fn get_text<'a>(&'a self) -> &'a str {
-        &self.textarea.lines()[0].trim()
+    pub fn get_text(&self) -> &str {
+        self.textarea.lines()[0].trim()
     }
 
     pub fn update_history(&mut self) {

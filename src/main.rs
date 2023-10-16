@@ -87,9 +87,9 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
         if let Some(i) = app.table_state.selected() {
             delete_item(conn, app.items[i].id)?;
 
-            app.items = select_items(&conn)?;
-            app.distinct_categories = select_categories(&conn)?;
-            app.distinct_descriptions = select_descriptions(&conn)?;
+            app.items = select_items(conn)?;
+            app.distinct_categories = select_categories(conn)?;
+            app.distinct_descriptions = select_descriptions(conn)?;
             app.table_state
                 .select(navigate_down(&app.items, app.table_state.selected(), 0));
         }
@@ -98,12 +98,12 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
+fn main_insert_date(app: &mut App, key: KeyEvent) {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
         if line.is_empty() {
             app.transition(AppState::Browse);
-        } else if let Some(date) = util::parse_date(&line) {
+        } else if let Some(date) = util::parse_date(line) {
             app.new_item.date = date.format("%F").to_string();
 
             app.transition(AppState::InsertDescription);
@@ -117,7 +117,7 @@ fn main_insert_date<'a>(app: &mut App<'a>, key: KeyEvent) {
     }
 }
 
-fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
+fn main_insert_description(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
     if handle_history_input(app, key) {
         return Ok(());
     }
@@ -133,7 +133,7 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connecti
             if let Some(item) = &app.item_template {
                 app.textarea.insert_str(&item.category);
                 app.update_history();
-            } else if let Ok(autofill) = select_category(&conn, &app.new_item.description) {
+            } else if let Ok(autofill) = select_category(conn, &app.new_item.description) {
                 app.textarea.insert_str(autofill);
                 app.update_history();
             }
@@ -146,7 +146,7 @@ fn main_insert_description<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connecti
     Ok(())
 }
 
-fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
+fn main_insert_category(app: &mut App, key: KeyEvent) {
     if handle_history_input(app, key) {
         return;
     }
@@ -165,23 +165,23 @@ fn main_insert_category<'a>(app: &mut App<'a>, key: KeyEvent) {
     }
 }
 
-fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) -> Result<()> {
+fn main_insert_price(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
     if key.code == KeyCode::Enter {
         let line = app.get_text();
-        if let Some(price) = util::parse_price(&line) {
+        if let Some(price) = util::parse_price(line) {
             let rowid: i64;
             app.new_item.price = price;
 
             if let Some(item) = &app.item_template {
                 rowid = item.id;
-                update_item(&conn, rowid, &app.new_item)?;
+                update_item(conn, rowid, &app.new_item)?;
             } else {
-                rowid = insert_item(&conn, &app.new_item)?;
+                rowid = insert_item(conn, &app.new_item)?;
             }
 
-            app.items = select_items(&conn)?;
-            app.distinct_categories = select_categories(&conn)?;
-            app.distinct_descriptions = select_descriptions(&conn)?;
+            app.items = select_items(conn)?;
+            app.distinct_categories = select_categories(conn)?;
+            app.distinct_descriptions = select_descriptions(conn)?;
             app.table_state
                 .select(app.items.iter().position(|item| item.id == rowid));
 
@@ -198,7 +198,7 @@ fn main_insert_price<'a>(app: &mut App<'a>, key: KeyEvent, conn: &Connection) ->
     Ok(())
 }
 
-fn handle_history_input<'a>(app: &mut App<'a>, key: KeyEvent) -> bool {
+fn handle_history_input(app: &mut App, key: KeyEvent) -> bool {
     if key.code == KeyCode::Up {
         app.list_state
             .select(navigate_up(&app.history, app.list_state.selected(), 1));

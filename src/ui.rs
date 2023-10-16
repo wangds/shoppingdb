@@ -2,7 +2,7 @@ use crate::app::{App, AppState, DbItem};
 use crate::util;
 use ratatui::{prelude::*, widgets::*};
 
-const KEY_BAR_ITEMS: &[(&'static str, &'static str)] = &[
+const KEY_BAR_ITEMS: &[(&str, &str)] = &[
     (" 1", "Help"),
     (" 2", "    "),
     (" 3", "    "),
@@ -44,7 +44,7 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
     let mut body: Vec<Row> = Vec::new();
 
     for item in &app.items {
-        body.push(make_table_row(&item));
+        body.push(make_table_row(item));
     }
 
     let mut widths = vec![
@@ -127,7 +127,7 @@ fn render_key_bar<B: Backend>(frame: &mut Frame<B>, layout: Rect) {
 
     let div = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(vec![Constraint::Percentage(10)].repeat(KEY_BAR_ITEMS.len()))
+        .constraints([Constraint::Percentage(10)].repeat(KEY_BAR_ITEMS.len()))
         .split(layout);
 
     for (i, &(key, text)) in KEY_BAR_ITEMS.iter().enumerate() {
