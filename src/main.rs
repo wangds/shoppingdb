@@ -83,6 +83,7 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
         }
     } else if key.code == KeyCode::F(7) {
         app.transition(AppState::InsertDate);
+        app.textarea.insert_str(util::today());
     } else if key.code == KeyCode::F(8) {
         if let Some(i) = app.table_state.selected() {
             delete_item(conn, app.items[i].id)?;

@@ -1,5 +1,9 @@
 use chrono::naive::NaiveDate;
 
+pub fn today() -> String {
+    chrono::offset::Local::now().format("%F").to_string()
+}
+
 pub fn parse_date(line: &str) -> Option<NaiveDate> {
     if let Ok(date) = NaiveDate::parse_from_str(line, "%F") {
         Some(date)
