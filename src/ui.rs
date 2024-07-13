@@ -4,7 +4,7 @@ use ratatui::{prelude::*, widgets::*};
 
 const KEY_BAR_ITEMS: &[(&str, &str)] = &[
     (" 1", "Help"),
-    (" 2", "    "),
+    (" 2", "Sort"),
     (" 3", "    "),
     (" 4", "Edit"),
     (" 5", "    "),

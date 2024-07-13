@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create app and run it
     let mut app = App::new();
-    let conn = Connection::open(DATABASE_FILE)?;
+    let mut conn = Connection::open(DATABASE_FILE)?;
     create_database(&conn)?;
 
     app.items = select_items(&conn)?;
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 match app.state {
-                    AppState::Browse => main_browse(&mut app, key, &conn)?,
+                    AppState::Browse => main_browse(&mut app, key, &mut conn)?,
                     AppState::InsertDate => main_insert_date(&mut app, key),
                     AppState::InsertDescription => main_insert_description(&mut app, key, &conn)?,
                     AppState::InsertCategory => main_insert_category(&mut app, key),
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
+fn main_browse(app: &mut App, key: KeyEvent, conn: &mut Connection) -> Result<()> {
     if key.code == KeyCode::Up {
         app.table_state
             .select(navigate_up(&app.items, app.table_state.selected(), 1));
@@ -75,6 +75,9 @@ fn main_browse(app: &mut App, key: KeyEvent, conn: &Connection) -> Result<()> {
         app.table_state.select(navigate_home(&app.items));
     } else if key.code == KeyCode::End {
         app.table_state.select(navigate_end(&app.items));
+    } else if key.code == KeyCode::F(2) {
+        sort_items(conn)?;
+        app.items = select_items(conn)?;
     } else if key.code == KeyCode::F(4) {
         if let Some(i) = app.table_state.selected() {
             app.item_template = Some(app.items[i].clone());
@@ -322,6 +325,39 @@ fn update_item(conn: &Connection, id: i64, item: &DbItem) -> Result<()> {
 
 fn delete_item(conn: &Connection, id: i64) -> Result<()> {
     conn.execute("DELETE FROM items WHERE id=?1", params![id])?;
+
+    Ok(())
+}
+
+fn sort_items(conn: &mut Connection) -> Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute("ALTER TABLE items RENAME TO items2", ())?;
+
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS items (
+             id INTEGER PRIMARY KEY,
+             date TEXT NOT NULL,
+             category TEXT NOT NULL,
+             description TEXT NOT NULL,
+             price INTEGER NOT NULL
+        )",
+        (),
+    )?;
+
+    tx.execute(
+        "INSERT INTO items(date, category, description, price)
+            SELECT date, category, description, price
+            FROM items2
+            ORDER BY date",
+        (),
+    )?;
+
+    tx.execute("DROP TABLE items2", ())?;
+
+    tx.commit()?;
+
+    conn.execute("VACUUM", ())?;
 
     Ok(())
 }
