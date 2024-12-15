@@ -9,6 +9,7 @@ use crate::app::{App, AppState, DbItem};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::{CrosstermBackend, Terminal};
 use rusqlite::{params, Connection, Result};
+use tui_textarea::CursorMove;
 
 const DATABASE_FILE: &str = "shopping.db";
 
@@ -223,7 +224,8 @@ fn handle_history_input(app: &mut App, key: KeyEvent) -> bool {
         if let Some(i) = app.list_state.selected() {
             if i < app.history.len() {
                 let text = String::from(&app.history[i]);
-                app.textarea.delete_str(0, usize::MAX);
+                app.textarea.move_cursor(CursorMove::Head);
+                app.textarea.delete_line_by_end();
                 app.textarea.insert_str(text);
                 app.update_history();
             }

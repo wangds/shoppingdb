@@ -15,7 +15,7 @@ const KEY_BAR_ITEMS: &[(&str, &str)] = &[
     ("10", "Quit"),
 ];
 
-pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
+pub fn render_tui(frame: &mut Frame, app: &mut App) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
@@ -23,7 +23,7 @@ pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
             Constraint::Length(1), // text area
             Constraint::Length(1), // key bar
         ])
-        .split(frame.size());
+        .split(frame.area());
 
     render_table(frame, layout[0], app);
     render_text_area(frame, layout[1], app);
@@ -31,7 +31,7 @@ pub fn render_tui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     render_text_completion(frame, app);
 }
 
-fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
+fn render_table(frame: &mut Frame, layout: Rect, app: &mut App) {
     let header = Row::new(vec![
         Cell::from(Line::from("Id").alignment(Alignment::Center)),
         Cell::from(Line::from("Date").alignment(Alignment::Center)),
@@ -64,12 +64,11 @@ fn render_table<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
     widths[2] = Constraint::Max(div[3].width / 3);
     widths[3] = Constraint::Min(div[3].width * 2 / 3);
 
-    let table = Table::new(body)
+    let table = Table::new(body, widths)
         .block(Block::default().borders(Borders::ALL))
         .header(header)
         .style(Style::default().fg(Color::White).bg(Color::Blue))
-        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
-        .widths(&widths);
+        .row_highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan));
 
     frame.render_stateful_widget(table, layout, &mut app.table_state);
 }
@@ -87,7 +86,7 @@ fn make_table_row<'a>(item: &DbItem) -> Row<'a> {
     ])
 }
 
-fn render_text_area<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut App) {
+fn render_text_area(frame: &mut Frame, layout: Rect, app: &mut App) {
     let prompt = Span::from(match app.state {
         AppState::Browse => "> ",
         AppState::InsertDate => "date> ",
@@ -118,10 +117,10 @@ fn render_text_area<B: Backend>(frame: &mut Frame<B>, layout: Rect, app: &mut Ap
         .split(layout);
 
     frame.render_widget(Paragraph::new(prompt), div[0]);
-    frame.render_widget(app.textarea.widget(), div[1]);
+    frame.render_widget(&app.textarea, div[1]);
 }
 
-fn render_key_bar<B: Backend>(frame: &mut Frame<B>, layout: Rect) {
+fn render_key_bar(frame: &mut Frame, layout: Rect) {
     let key_style = Style::default().fg(Color::White).bg(Color::Black);
     let text_style = Style::default().fg(Color::Black).bg(Color::Cyan);
 
@@ -136,8 +135,8 @@ fn render_key_bar<B: Backend>(frame: &mut Frame<B>, layout: Rect) {
     }
 }
 
-fn render_text_completion<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
-    if app.history.is_empty() || frame.size().height <= 7 {
+fn render_text_completion(frame: &mut Frame, app: &mut App) {
+    if app.history.is_empty() || frame.area().height <= 7 {
         return;
     }
 
@@ -156,8 +155,8 @@ fn render_text_completion<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         .style(Style::default().fg(Color::White).bg(Color::Cyan))
         .highlight_style(Style::default().fg(Color::LightYellow).bg(Color::Black));
 
-    let frame_width = frame.size().width;
-    let frame_height = frame.size().height - 2;
+    let frame_width = frame.area().width;
+    let frame_height = frame.area().height - 2;
     let height = std::cmp::min(list.len() as u16 + 2, frame_height - 3);
     let area = Rect::new(4, frame_height - height, frame_width - 2 * 4 - 1, height);
     frame.render_widget(Clear, area);
